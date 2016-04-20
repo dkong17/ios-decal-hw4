@@ -24,6 +24,8 @@ class PlayerViewController: UIViewController {
     var artistLabel: UILabel!
     var titleLabel: UILabel!
     
+    var seeker : UISlider!
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         view = UIView(frame: UIScreen.mainScreen().bounds)
@@ -34,9 +36,12 @@ class PlayerViewController: UIViewController {
         currentIndex = 0
         
         player = AVPlayer()
+        player.addObserver(self, forKeyPath: "status", options:
+            NSKeyValueObservingOptions(), context: nil)
         
         loadVisualElements()
         loadPlayerButtons()
+        //loadSeeker()
     }
     
     func loadVisualElements() {
@@ -61,6 +66,14 @@ class PlayerViewController: UIViewController {
         artistLabel.textAlignment = NSTextAlignment.Center
         artistLabel.textColor = UIColor.grayColor()
         view.addSubview(artistLabel)
+    }
+    
+    func loadSeeker() {
+        let width = UIScreen.mainScreen().bounds.size.width
+        let height = UIScreen.mainScreen().bounds.size.height
+        let offset = height - width
+        seeker = UISlider(frame: CGRect(x: 0.0, y: trackImageView.frame.height, width: width, height: 10.0))
+        view.addSubview(seeker)
     }
     
     
@@ -130,7 +143,27 @@ class PlayerViewController: UIViewController {
         let track = tracks[currentIndex]
         let url = NSURL(string: "https://api.soundcloud.com/tracks/\(track.id)/stream?client_id=\(clientID)")!
         // FILL ME IN
+        if player.currentItem == nil {
+            player.replaceCurrentItemWithPlayerItem(AVPlayerItem(URL: url))
+        }
+        else {
+            playPauseButton.selected ? player.pause() : player.play()
+            playPauseButton.selected = !playPauseButton.selected
+        }
+    }
     
+    override func observeValueForKeyPath(keyPath: String?, ofObject object: AnyObject?, change:
+        [String : AnyObject]?, context: UnsafeMutablePointer<Void>) {
+            if object!.isKindOfClass(AVPlayer) && keyPath == "status" {
+                if player.status == AVPlayerStatus.ReadyToPlay {
+                    playPauseButton.selected = true
+                    player.play()
+                }
+                else if player.status == AVPlayerStatus.Failed {
+                    playPauseButton.selected = false
+                    player = AVPlayer()
+                }
+            }
     }
     
     /* 
@@ -140,7 +173,16 @@ class PlayerViewController: UIViewController {
      * Remember to update the currentIndex
      */
     func nextTrackTapped(sender: UIButton) {
-    
+        if (currentIndex == tracks.count) {
+            return
+        }
+        currentIndex! += 1
+        let path = NSBundle.mainBundle().pathForResource("Info", ofType: "plist")
+        let clientID = NSDictionary(contentsOfFile: path!)?.valueForKey("client_id") as! String
+        let track = tracks[currentIndex]
+        let url = NSURL(string: "https://api.soundcloud.com/tracks/\(track.id)/stream?client_id=\(clientID)")!
+        player.replaceCurrentItemWithPlayerItem(AVPlayerItem(URL: url))
+        loadTrackElements()
     }
 
     /*
@@ -154,7 +196,21 @@ class PlayerViewController: UIViewController {
      */
 
     func previousTrackTapped(sender: UIButton) {
-    
+        if CMTimeGetSeconds(player.currentTime()) > Float64(3.0) {
+            player.seekToTime(CMTimeMakeWithSeconds(Float64(0.0), player.currentTime().timescale))
+        }
+        else {
+            if currentIndex == 0 {
+                return;
+            }
+            currentIndex! -= 1
+            let path = NSBundle.mainBundle().pathForResource("Info", ofType: "plist")
+            let clientID = NSDictionary(contentsOfFile: path!)?.valueForKey("client_id") as! String
+            let track = tracks[currentIndex]
+            let url = NSURL(string: "https://api.soundcloud.com/tracks/\(track.id)/stream?client_id=\(clientID)")!
+            player.replaceCurrentItemWithPlayerItem(AVPlayerItem(URL: url))
+            loadTrackElements()
+        }
     }
     
     
